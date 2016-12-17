@@ -20,19 +20,15 @@ if [ "Darwin" == `uname` ]; then
         sudo /usr/bin/xcode-select -switch ${XCODE_PATH}
     fi
 
-    if [ ! -x /usr/local/bin/virtualenv ]; then
+    VIRTUALENV=$(which virtualenv)
+    if [ "$VIRTUALENV" == "" ]; then
         echo "VirtualEnv requires system permissions to install..."
         sudo easy_install distribute
         sudo easy_install virtualenv
     fi
 
     if [ ! -d env ]; then
-        echo "Creating your virtualenv environment"
-        PYTHON=`which pypy`
-        if [ "$PYTHON" == "" ]; then
-            PYTHON=`which python`
-        fi
-        virtualenv --prompt "[$PROJECT] " --distribute -p $PYTHON env
+        virtualenv --clear --verbose --prompt "[$PROJECT] " --distribute -p python2.7 env
     fi
 fi
 
