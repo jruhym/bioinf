@@ -1,14 +1,7 @@
-# bioinf.py version 1.1 6/15/12 (m/d/y)
 # Library for bioinformatics stuff
-# It requires that NumPy be installed (See scipy.org). 
-# This file should be located in your $PYTHONPATH.
 # University of the Sciences 2012
-# All rights reserved. To be used for acedemic purposes only.
+# All rights reserved. To be used for academic purposes only.
 # Andrew J. Heim <lastfirstMI at gmail>
-#
-# v1.1
-# Added parse_pdb_HELIX_line
-# AJH 6/15/12
 
 '''This is a library for bioinformatics stuff.
 
