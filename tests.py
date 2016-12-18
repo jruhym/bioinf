@@ -236,7 +236,7 @@ class ProteinDataBankResolutionSpec(unittest.TestCase):
 
     def test_should_resolve_from_the_web(self):
         get_pdb_resolution_from_web.when.called_with(
-            '2rh1').should.return_value('2.40')
+            '2rh1').should.return_value('2.4')
 
     def test_should_give_not_found_if_pdbID_does_not_exist(self):
         get_pdb_resolution_from_web.when.called_with(

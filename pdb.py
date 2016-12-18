@@ -1,6 +1,6 @@
 import urllib2
-from htmllib import HTMLParser # Note this library deprecated
-import formatter
+from HTMLParser import HTMLParser
+# import formatter
 import os
 import os.path
 from numpy import array, append
@@ -307,24 +307,23 @@ def print_pdb_ATOM_line(atm_dic):
 
 # This class will be used by the pdbid_rsln
 class PDBParser(HTMLParser):
-    def __init__(self, verbose=0):
+    def __init__(self):
 
-        """Inherited from htmllib.HTMLParser + init of outwithit and 
+        """Inherited from HTMLParser.HTMLParser + init of outwithit and 
         resolution.
 
         """
 
-        HTMLParser.__init__(self, verbose)
+        HTMLParser.__init__(self)
         self.outwithit = False
         self.resolution = ''
-    def start_td(self, attributes):
-        if attributes == [('id', 'se_xrayResolution')]:
-            self.outwithit = True
+ 
     def handle_data(self, data):
-        if self.outwithit:
+        if data == "Resolution":
+            self.outwithit = True
+        elif self.outwithit:
             self.resolution = data
-    def end_td(self):
-        self.outwithit = False
+            self.outwithit = False
 
 def get_pdb_resolution_from_web(pdbid):
 
@@ -336,14 +335,9 @@ def get_pdb_resolution_from_web(pdbid):
     if 'No results were found matching your query' in pagecontents:
         resolution = 'N/F'
     else:
-
-        w = formatter.DumbWriter()
-
-        format = formatter.NullFormatter()
-        parse = PDBParser(format)
-    #try:
+        parse = PDBParser()
         parse.feed(pagecontents)
-        resolution = parse.resolution.strip()
+        resolution = parse.resolution.split(":")[-1].strip()
     if not len(resolution):
         resolution = 'N/A'
     return resolution
