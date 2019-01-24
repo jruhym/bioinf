@@ -3,6 +3,7 @@ from HTMLParser import HTMLParser
 # import formatter
 import os
 import os.path
+import re
 from numpy import array, append
 
 
@@ -327,17 +328,15 @@ class PDBParser(HTMLParser):
 
 def get_pdb_resolution_from_web(pdbid):
 
-    url = 'http://www.pdb.org/pdb/explore/explore.do?structureId=%s' % \
-        (pdbid.upper())
-    pdbWebPage_f = urllib2.urlopen(url)
-    pagecontents = pdbWebPage_f.read()
-    pdbWebPage_f.close()
-    if 'No results were found matching your query' in pagecontents:
+    url = 'https://www.rcsb.org/structure/%s' % \
+    (pdbid.upper())
+    try:
+        pdbWebPage_f = urllib2.urlopen(url)
+        pagecontents = pdbWebPage_f.read()
+    except urllib2.HTTPError:
         resolution = 'N/F'
-    else:
-        parse = PDBParser()
-        parse.feed(pagecontents)
-        resolution = parse.resolution.split(":")[-1].strip()
+        return resolution
+    resolution = re.search('(?<=\<strong\>Resolution:&nbsp<\/strong\>)(.*?)(?=&nbsp&Aring;)', pagecontents).group(1)
     if not len(resolution):
         resolution = 'N/A'
     return resolution
@@ -349,7 +348,7 @@ def pdb_rsln(pdbid):
 
     Arguments: pdbid, a string with the four-character pdbid of the protein  
     for which you want the resoulution. This function seeks that resolution 
-    on the protein databank website, pdb.org
+    on the protein databank website, rcsb.org
     
     """
 
@@ -385,8 +384,7 @@ def pdb_rsln(pdbid):
         if not os.path.exists(db_dir):
             os.makedirs(db_dir)
 
-    get_pdb_resolution_from_web(pdbid)
-
+    rsln = '%.2f' % float(get_pdb_resolution_from_web(pdbid))
     f = open(db_path, 'a')
     f.write('%s %s\n' % (pdbid, rsln))
     f.close()
