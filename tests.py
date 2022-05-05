@@ -3,7 +3,7 @@ import sure
 from .funcs import *
 from .pdb import *
 from numpy.testing import assert_array_equal
-from StringIO import StringIO
+from io import StringIO
  
 
 
