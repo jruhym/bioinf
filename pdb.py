@@ -224,6 +224,11 @@ class PDBAtomLine(object):
             self._resSeq, self._iCode, self._x, self._y, self._z, self._occupancy, 
             self._tempFactor, self._element, self._charge)
 
+    def copy_with_name(self, name):
+        return PDBAtomLine(self._serial, name, self._altLoc, self._resName, self._chainID, 
+            self._resSeq, self._iCode, self._x, self._y, self._z, self._occupancy, 
+            self._tempFactor, self._element, self._charge)
+
     def as_dict(self, atom='ATOM'):
         parts = {}
         parts['ATOM'] = atom
