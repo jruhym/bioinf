@@ -173,11 +173,12 @@ class PDBAtomLine(object):
             cleanstring[54:60],
             cleanstring[60:66],
             cleanstring[76:78],
-            cleanstring[78:]
+            cleanstring[78:],
+            cleanstring[:6].strip()
         )
     
     def __init__(self, serial, name, altLoc, resName, chainID, resSeq, 
-        iCode, x, y, z, occupancy, tempFactor, element, charge):
+        iCode, x, y, z, occupancy, tempFactor, element, charge, kind='ATOM'):
         self._serial = serial.strip()
         self._name = name.strip()
         self._altLoc = altLoc.strip()
