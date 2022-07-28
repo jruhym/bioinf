@@ -259,6 +259,8 @@ class PDBAtomLine(object):
     def print(self, atom='ATOM'): #TODO: give class an ATOM propery with default value and convert this to __string__ method
         return print_pdb_ATOM_line(self.as_dict(atom))
 
+    def __str__(self):
+        return print_pdb_ATOM_line(self.as_dict())
 
 
 def parse_pdb_ATOM_line(atm_line):
