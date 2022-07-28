@@ -194,12 +194,13 @@ class PDBAtomLine(object):
         self._tempFactor = tempFactor.strip()
         self._element = element.strip()
         self._charge = charge.strip()
+        self._kind = kind
 
     @classmethod
     def for_dict(cls, dict):
         return PDBAtomLine(dict['serial'], dict['name'], dict['altLoc'], dict['resName'], 
             dict['chainID'], dict['resSeq'], dict['iCode'], dict['x'], dict['y'], dict['z'], 
-            dict['occupancy'], dict['tempFactor'], dict['element'], dict['charge'])
+            dict['occupancy'], dict['tempFactor'], dict['element'], dict['charge'], dict.get('ATOM', 'ATOM'))
 
     serial = property(lambda self: self._serial)
     name = property(lambda self: self._name)
@@ -215,25 +216,26 @@ class PDBAtomLine(object):
     tempFactor = property(lambda self: self._tempFactor)
     element = property(lambda self: self._element)
     charge = property(lambda self: self._charge)
+    kind = property(lambda self: self._kind)
 
     def copy_with_serial(self, serial):
         return PDBAtomLine(serial, self._name, self._altLoc, self._resName, self._chainID, 
             self._resSeq, self._iCode, self._x, self._y, self._z, self._occupancy, 
-            self._tempFactor, self._element, self._charge)
+            self._tempFactor, self._element, self._charge, self._kind)
 
     def copy_with_chainID(self, chainID):
         return PDBAtomLine(self._serial, self._name, self._altLoc, self._resName, chainID, 
             self._resSeq, self._iCode, self._x, self._y, self._z, self._occupancy, 
-            self._tempFactor, self._element, self._charge)
+            self._tempFactor, self._element, self._charge, self._kind)
 
     def copy_with_name(self, name):
         return PDBAtomLine(self._serial, name, self._altLoc, self._resName, self._chainID, 
             self._resSeq, self._iCode, self._x, self._y, self._z, self._occupancy, 
-            self._tempFactor, self._element, self._charge)
+            self._tempFactor, self._element, self._charge, self._kind)
 
     def as_dict(self, atom='ATOM'):
         parts = {}
-        parts['ATOM'] = atom
+        parts['ATOM'] = self._kind
         parts['serial'] = self._serial
         parts['blank1'] = ' '
         parts['name'] = self._name
