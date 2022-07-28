@@ -157,7 +157,8 @@ class PDBAtomLine(object):
         # make sure string is long enough. If not, pad it on the right with ' ' 
         cleanstring += (80 - len(cleanstring)) * ' '
 
-        assert cleanstring[:6].strip() in ['ATOM', 'HETATM']
+        if not cleanstring[:6].strip() in ['ATOM', 'HETATM']:
+            return None
 
         return PDBAtomLine(
             cleanstring[6:11],
