@@ -3,7 +3,8 @@ from urllib.error import URLError as urlerror
 import os
 import os.path
 import re
-from numpy import array, append
+from numpy import array, append # TODO: use np
+import numpy as np
 from bs4 import BeautifulSoup
 
 class PDBHelixLine(object):
@@ -262,6 +263,93 @@ class PDBAtomLine(object):
     def __str__(self):
         return print_pdb_ATOM_line(self.as_dict())
 
+class PDBProtein(object):
+    def __init__(self, atoms_lines, forces=np.array([])):
+        does_have_forces = forces.size > 0
+        if does_have_forces:
+            assert(type(forces) == np.ndarray)
+            assert(forces.shape == (len(atoms), 3))
+        
+        residues = {}
+        self._residues = []
+        for i, atom_line in enumerate(atoms_lines):
+            atom = PDBAtom(atom_line, forces[i]) if does_have_forces else PDBAtom(atom_line)
+            res_atoms = residues.get(atom.resSeq, [])
+            res_atoms.append(atom)
+            residues[atom.resSeq] = res_atoms
+        for res_atoms in residues.values():
+            self._residues.append(PDBResidue(res_atoms))
+    
+    residues = property(lambda self: self._residues)
+
+    def strip_hydrogens(self):
+        for residue in self._residues:
+            residue.strip_hydrogens()
+
+    def rename_atoms(self, names_map):
+        for residue in self._residues:
+            residue.rename_atoms(names_map)
+
+    def __str__(self):
+        return '\n'.join(f"{residue_out}" for residue_out in [str(residue) for residue in self._residues])
+
+class PDBResidue(object):
+    def __init__(self, atoms, forces=np.array([])):
+        if forces.size > 0:
+            assert(type(forces) == np.ndarray)
+            assert(forces.shape == (len(atoms), 3))
+            for i,force in enumerate(forces):
+                atoms[i].set_force(force)
+        self._atoms = atoms
+
+    atoms = property(lambda self: self._atoms)
+    force = property(lambda self: np.sum(np.array([atom.force for atom in self._atoms]), axis=0))
+    resSeq = property(lambda self: self._atoms[0].resSeq)
+    resName = property(lambda self: self._atoms[0].resName)
+
+    def strip_hydrogens(self):
+        self._atoms = [atom for atom in self._atoms if not atom.is_hydrogen()]
+
+    def reorder_by_names(self, names):
+        assert(len(names) == len(self._atoms))
+        atom_by_name = {atom.name : atom for atom in self._atoms}
+        try:
+            self._atoms = [atom_by_name[name] for name in names]
+        finally:
+            return
+
+    def rename_atoms(self, names_map):
+        for atom in self._atoms:
+            atom.set_name(names_map[atom.name])
+
+    def __str__(self):
+        return '\n'.join(f"{atom_out}" for atom_out in [str(atom) for atom in self._atoms])
+
+class PDBAtom(object):
+    def __init__(self, atom_line, force=np.zeros(3)):
+        self._atom_line = atom_line
+        self._force = force
+    
+    def set_force(self, force):
+        assert(type(force) == np.ndarray)
+        assert(force.dtype == np.float64)
+        self._force = force
+    
+    name = property(lambda self: self._atom_line.name)
+    force = property(lambda self: self._force, set_force)
+    resSeq = property(lambda self: self._atom_line.resSeq)
+    resName = property(lambda self: self._atom_line.resName)
+
+    def set_name(self, name):
+        assert type(name) == str
+        self._name = name
+        self._atom_line = self._atom_line.copy_with_name(name)
+
+    def is_hydrogen(self):
+        return self._atom_line.element == 'H'
+
+    def __str__(self):
+        return str(self._atom_line)
 
 def parse_pdb_ATOM_line(atm_line):
 
