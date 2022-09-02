@@ -360,6 +360,7 @@ class PDBAtom(object):
     force = property(lambda self: self._force, set_force)
     resSeq = property(lambda self: self._atom_line.resSeq)
     resName = property(lambda self: self._atom_line.resName)
+    r = property(lambda self: np.array([float(self._atom_line.x), float(self._atom_line.y), float(self._atom_line.z)]))
 
     def set_name(self, name):
         assert type(name) == str
