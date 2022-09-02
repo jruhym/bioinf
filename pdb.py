@@ -234,6 +234,27 @@ class PDBAtomLine(object):
             self._resSeq, self._iCode, self._x, self._y, self._z, self._occupancy, 
             self._tempFactor, self._element, self._charge, self._kind)
 
+    def copy_with(self, serial="<replace>", name="<replace>", altLoc="<replace>", resName="<replace>",
+        chainID="<replace>", resSeq="<replace>", iCode="<replace>", x="<replace>", y="<replace>", z="<replace>",
+        occupancy="<replace>", tempFactor="<replace>", element="<replace>", charge="<replace>",
+        kind="<replace>"):
+        return PDBAtomLine(self._serial if serial == "<replace>" else serial,
+            self._name if name == "<replace>" else name,
+            self._altLoc if altLoc == "<replace>" else altLoc,
+            self._resName if resName == "<replace>" else resName,
+            self._chainID if chainID == "<replace>" else chainID,
+            self._resSeq if resSeq == "<replace>" else resSeq,
+            self._iCode if iCode == "<replace>" else iCode,
+            self._x if x == "<replace>" else x,
+            self._y if y == "<replace>" else y,
+            self._z if z == "<replace>" else z,
+            self._occupancy if occupancy == "<replace>" else occupancy,
+            self._tempFactor if tempFactor == "<replace>" else tempFactor,
+            self._element if element == "<replace>" else element,
+            self._charge if charge == "<replace>" else charge,
+            self._kind if kind == "<replace>" else kind
+        )
+
     def as_dict(self, atom='ATOM'):
         parts = {}
         parts['ATOM'] = self._kind
