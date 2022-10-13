@@ -90,7 +90,7 @@ def float_list(listFloats):
     """Return a numpy array of floats from a list of strings of floats
 
     """
-    if isinstance(listFloats, (basestring)):
+    if isinstance(listFloats, (str)):
         templistFloats = [listFloats]
         listFloats = templistFloats
     try:
@@ -103,7 +103,7 @@ def float_list(listFloats):
         try:
             if isinstance(listFloats[i], complex):
                 listFloats[i] = abs(listFloats[i])
-            if isinstance(listFloats[i], basestring):
+            if isinstance(listFloats[i], str):
                 if listFloats[i].lower().strip() == 'pi':
                     listFloats[i] = pi
                 elif listFloats[i].lower().strip() == 'e':
@@ -188,9 +188,9 @@ class ContactEnd(object):
         return ContactEnd(parts[0], int(parts[1]), parts[2], )
 
     def __init__(self, residue1_name, UID1, atom1_name):
-        assert isinstance(residue_name, basestring)
+        assert isinstance(residue_name, str)
         assert isinstance(UID, int)
-        assert isinstance(atom_name, basestring)
+        assert isinstance(atom_name, str)
 
         self._residue_name = residue_name
         self._UID = UID
@@ -215,7 +215,7 @@ class ContactEnd(object):
 class InterresidueContact(object):
 
     def __init__(self, contact_line):
-        assert isinstance(contact_line, basestring)
+        assert isinstance(contact_line, str)
         parts = contact_line.split()
         self._contact_dex = int(parts[0])
         self._type = parts[1]
