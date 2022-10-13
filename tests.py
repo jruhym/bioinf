@@ -56,7 +56,7 @@ class ProteinDataBankAtomParser(unittest.TestCase):
             'ATOM     32  N2 AARG A  -3B     11.281  86.699  ' + \
             '94.383  0.50 35.88           N-12'
             ).should.return_value(
-            {'ATOM': 'ATOM  ',
+            {'ATOM': 'ATOM',
              'altLoc': 'A',
              'blank1': ' ',
              'blank2': ' ',
@@ -236,7 +236,7 @@ class ProteinDataBankResolutionSpec(unittest.TestCase):
 
     def test_should_resolve_from_the_web(self):
         get_pdb_resolution_from_web.when.called_with(
-            '2rh1').should.return_value('2.4')
+            '2rh1').should.return_value('2.40')
 
     def test_should_give_not_found_if_pdbID_does_not_exist(self):
         get_pdb_resolution_from_web.when.called_with(
