@@ -1,11 +1,11 @@
-import urllib2
-from HTMLParser import HTMLParser
-# import formatter
+import urllib.request as urlrequest
+from urllib.error import URLError as urlerror
 import os
 import os.path
 import re
-from numpy import array, append
-
+from numpy import array, append # TODO: use np
+import numpy as np
+from bs4 import BeautifulSoup
 
 class PDBHelixLine(object):
 
@@ -158,13 +158,14 @@ class PDBAtomLine(object):
         # make sure string is long enough. If not, pad it on the right with ' ' 
         cleanstring += (80 - len(cleanstring)) * ' '
 
-        assert cleanstring[:6].strip() == 'ATOM'
+        if not cleanstring[:6].strip() in ['ATOM', 'HETATM']:
+            return None
 
         return PDBAtomLine(
             cleanstring[6:11],
             cleanstring[12:16],
             cleanstring[16],
-            cleanstring[17:20],
+            cleanstring[17:21].strip(), #4-letter residues
             cleanstring[21],
             cleanstring[22:26],
             cleanstring[26],
@@ -174,10 +175,12 @@ class PDBAtomLine(object):
             cleanstring[54:60],
             cleanstring[60:66],
             cleanstring[76:78],
-            cleanstring[78:]
+            cleanstring[78:],
+            cleanstring[:6].strip()
         )
+    
     def __init__(self, serial, name, altLoc, resName, chainID, resSeq, 
-        iCode, x, y, z, occupancy, tempFactor, element, charge):
+        iCode, x, y, z, occupancy, tempFactor, element, charge, kind='ATOM'):
         self._serial = serial.strip()
         self._name = name.strip()
         self._altLoc = altLoc.strip()
@@ -192,7 +195,13 @@ class PDBAtomLine(object):
         self._tempFactor = tempFactor.strip()
         self._element = element.strip()
         self._charge = charge.strip()
+        self._kind = kind
 
+    @classmethod
+    def for_dict(cls, dict):
+        return PDBAtomLine(dict['serial'], dict['name'], dict['altLoc'], dict['resName'], 
+            dict['chainID'], dict['resSeq'], dict['iCode'], dict['x'], dict['y'], dict['z'], 
+            dict['occupancy'], dict['tempFactor'], dict['element'], dict['charge'], dict.get('ATOM', 'ATOM'))
 
     serial = property(lambda self: self._serial)
     name = property(lambda self: self._name)
@@ -208,8 +217,161 @@ class PDBAtomLine(object):
     tempFactor = property(lambda self: self._tempFactor)
     element = property(lambda self: self._element)
     charge = property(lambda self: self._charge)
+    kind = property(lambda self: self._kind)
 
+    def copy_with_serial(self, serial):
+        return PDBAtomLine(serial, self._name, self._altLoc, self._resName, self._chainID, 
+            self._resSeq, self._iCode, self._x, self._y, self._z, self._occupancy, 
+            self._tempFactor, self._element, self._charge, self._kind)
 
+    def copy_with_chainID(self, chainID):
+        return PDBAtomLine(self._serial, self._name, self._altLoc, self._resName, chainID, 
+            self._resSeq, self._iCode, self._x, self._y, self._z, self._occupancy, 
+            self._tempFactor, self._element, self._charge, self._kind)
+
+    def copy_with_name(self, name):
+        return PDBAtomLine(self._serial, name, self._altLoc, self._resName, self._chainID, 
+            self._resSeq, self._iCode, self._x, self._y, self._z, self._occupancy, 
+            self._tempFactor, self._element, self._charge, self._kind)
+
+    def copy_with(self, serial="<replace>", name="<replace>", altLoc="<replace>", resName="<replace>",
+        chainID="<replace>", resSeq="<replace>", iCode="<replace>", x="<replace>", y="<replace>", z="<replace>",
+        occupancy="<replace>", tempFactor="<replace>", element="<replace>", charge="<replace>",
+        kind="<replace>"):
+        return PDBAtomLine(self._serial if serial == "<replace>" else serial,
+            self._name if name == "<replace>" else name,
+            self._altLoc if altLoc == "<replace>" else altLoc,
+            self._resName if resName == "<replace>" else resName,
+            self._chainID if chainID == "<replace>" else chainID,
+            self._resSeq if resSeq == "<replace>" else resSeq,
+            self._iCode if iCode == "<replace>" else iCode,
+            self._x if x == "<replace>" else x,
+            self._y if y == "<replace>" else y,
+            self._z if z == "<replace>" else z,
+            self._occupancy if occupancy == "<replace>" else occupancy,
+            self._tempFactor if tempFactor == "<replace>" else tempFactor,
+            self._element if element == "<replace>" else element,
+            self._charge if charge == "<replace>" else charge,
+            self._kind if kind == "<replace>" else kind
+        )
+
+    def as_dict(self, atom='ATOM'):
+        parts = {}
+        parts['ATOM'] = self._kind
+        parts['serial'] = self._serial
+        parts['blank1'] = ' '
+        parts['name'] = self._name
+        parts['altLoc'] = self._altLoc
+        parts['resName'] = self._resName
+        parts['blank2'] = ' '
+        parts['chainID'] = self._chainID
+        parts['resSeq'] = self._resSeq
+        parts['iCode'] = self._iCode
+        parts['blank3'] = 3 * ' '
+        parts['x'] = self._x
+        parts['y'] = self._y
+        parts['z'] = self._z
+        parts['occupancy'] = self._occupancy
+        parts['tempFactor'] = self._tempFactor
+        parts['blank4'] = 10 * ' '
+        parts['element'] = self._element
+        parts['charge'] = self._charge
+        return parts
+
+    def print(self, atom='ATOM'): #TODO: give class an ATOM propery with default value and convert this to __string__ method
+        return print_pdb_ATOM_line(self.as_dict(atom))
+
+    def __str__(self):
+        return print_pdb_ATOM_line(self.as_dict())
+
+class PDBProtein(object):
+    def __init__(self, atoms_lines, forces=np.array([])):
+        does_have_forces = forces.size > 0
+        if does_have_forces:
+            assert(type(forces) == np.ndarray)
+            assert(forces.shape == (len(atoms), 3))
+        
+        residues = {}
+        self._residues = []
+        for i, atom_line in enumerate(atoms_lines):
+            atom = PDBAtom(atom_line, forces[i]) if does_have_forces else PDBAtom(atom_line)
+            res_atoms = residues.get(atom.resSeq, [])
+            res_atoms.append(atom)
+            residues[atom.resSeq] = res_atoms
+        for res_atoms in residues.values():
+            self._residues.append(PDBResidue(res_atoms))
+    
+    residues = property(lambda self: self._residues)
+
+    def strip_hydrogens(self):
+        for residue in self._residues:
+            residue.strip_hydrogens()
+
+    def rename_atoms(self, names_map):
+        for residue in self._residues:
+            residue.rename_atoms(names_map)
+
+    def __str__(self):
+        return '\n'.join(f"{residue_out}" for residue_out in [str(residue) for residue in self._residues])
+
+class PDBResidue(object):
+    def __init__(self, atoms, forces=np.array([])):
+        if forces.size > 0:
+            assert(type(forces) == np.ndarray)
+            assert(forces.shape == (len(atoms), 3))
+            for i,force in enumerate(forces):
+                atoms[i].set_force(force)
+        self._atoms = atoms
+
+    atoms = property(lambda self: self._atoms)
+    force = property(lambda self: np.sum(np.array([atom.force for atom in self._atoms]), axis=0))
+    resSeq = property(lambda self: self._atoms[0].resSeq)
+    resName = property(lambda self: self._atoms[0].resName)
+
+    def strip_hydrogens(self):
+        self._atoms = [atom for atom in self._atoms if not atom.is_hydrogen()]
+
+    def reorder_by_names(self, names):
+        assert(len(names) == len(self._atoms))
+        atom_by_name = {atom.name : atom for atom in self._atoms}
+        try:
+            self._atoms = [atom_by_name[name] for name in names]
+        finally:
+            return
+
+    def rename_atoms(self, names_map):
+        for atom in self._atoms:
+            atom.set_name(names_map[atom.name])
+
+    def __str__(self):
+        return '\n'.join(f"{atom_out}" for atom_out in [str(atom) for atom in self._atoms])
+
+class PDBAtom(object):
+    def __init__(self, atom_line, force=np.zeros(3)):
+        self._atom_line = atom_line
+        self._force = force
+    
+    def set_force(self, force):
+        assert(type(force) == np.ndarray)
+        assert(force.dtype == np.float64)
+        self._force = force
+    
+    name = property(lambda self: self._atom_line.name)
+    force = property(lambda self: self._force, set_force)
+    resSeq = property(lambda self: self._atom_line.resSeq)
+    resName = property(lambda self: self._atom_line.resName)
+    r = property(lambda self: np.array([float(self._atom_line.x), float(self._atom_line.y), float(self._atom_line.z)]))
+
+    def set_name(self, name):
+        assert type(name) == str
+        self._name = name
+        self._atom_line = self._atom_line.copy_with_name(name)
+
+    def is_hydrogen(self):
+        return self._atom_line.element == 'H'
+
+    def __str__(self):
+        return str(self._atom_line)
 
 def parse_pdb_ATOM_line(atm_line):
 
@@ -242,45 +404,25 @@ def parse_pdb_ATOM_line(atm_line):
     'charge':     Charge on the atom
 
     Source:
-    http://www.wwpdb.org/documentation/format32/sect9.html#ATOM
-
+    http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM
     """
 
     assert type(atm_line) == str
 
     parts = {}
     cleanstring = atm_line.strip()
-    #short = 80 - len(cleanstring)
-    #make sure the string is long enough. If not, pad it on the right with ' '
-    #if short > 0:
-    #    for i in range(short):
-    #        cleanstring += ' '
     cleanstring += (80 - len(cleanstring)) * ' '
     parts['ATOM'] = cleanstring[:6]
-    assert parts['ATOM'].strip() == 'ATOM'
+
+    atm = parts['ATOM'].strip()
+    if atm not in ['ATOM', 'HETATM']:
+        return None
+
+    assert atm == 'ATOM' or atm == 'HETATM'
 
     line = PDBAtomLine.parse_string(atm_line)
-
-    parts['serial'] = line.serial
-    parts['blank1'] = ' '
-    parts['name'] = line.name
-    parts['altLoc'] = line.altLoc
-    parts['resName'] = line.resName
-    parts['blank2'] = ' '
-    parts['chainID'] = line.chainID
-    parts['resSeq'] = line.resSeq
-    parts['iCode'] = line.iCode
-    parts['blank3'] = 3 * ' '
-    parts['x'] = line.x
-    parts['y'] = line.y
-    parts['z'] = line.z
-    parts['occupancy'] = line.occupancy
-    parts['tempFactor'] = line.tempFactor
-    parts['blank4'] = 10 * ' '
-    parts['element'] = line.element
-    parts['charge'] = line.charge
-    return parts
-
+    
+    return line.as_dict(atm)
 
 
 def print_pdb_ATOM_line(atm_dic):
@@ -288,11 +430,12 @@ def print_pdb_ATOM_line(atm_dic):
     assert type(atm_dic) == dict
 
     atmLine = ''
-    keys = ['ATOM','serial', 'blank1', 'name', 'altLoc', 'resName', 'blank2', 
-               'chainID', 'resSeq', 'iCode', 'blank3', 'x', 'y', 'z', 
-                'occupancy', 'tempFactor', 'blank4', 'element', 'charge']
-    lengths = [6,5,1,4,1,3,1,1,4,1,3,8,8,8,6,6,10,2,2]
-    justification = [0,1,0,0,0,0,0,0,1,0,0,1,1,1,1,1,0,1,1]
+    keys = ['ATOM','serial', 'blank1', 'name', 'altLoc', 'resName', 
+                'chainID', 'resSeq', 'iCode', 'blank3', 'x', 'y', 'z', 
+                'occupancy', 'tempFactor', 'blank4', 'element', 'charge'
+            ]
+    lengths = [6,5,1,4,1,4,1,4,1,3,8,8,8,6,6,10,2,2]
+    justification = [0,1,0,0,0,0,0,1,0,0,1,1,1,1,1,0,1,1]
     for i, key in enumerate(keys):
         cur_val = atm_dic[key]
         if key == 'name' and cur_val[0] != ' ' and len(cur_val) < 4:
@@ -305,38 +448,18 @@ def print_pdb_ATOM_line(atm_dic):
     return atmLine
 
 
-
-# This class will be used by the pdbid_rsln
-class PDBParser(HTMLParser):
-    def __init__(self):
-
-        """Inherited from HTMLParser.HTMLParser + init of outwithit and 
-        resolution.
-
-        """
-
-        HTMLParser.__init__(self)
-        self.outwithit = False
-        self.resolution = ''
- 
-    def handle_data(self, data):
-        if data == "Resolution":
-            self.outwithit = True
-        elif self.outwithit:
-            self.resolution = data
-            self.outwithit = False
-
 def get_pdb_resolution_from_web(pdbid):
-
-    url = 'https://www.rcsb.org/structure/%s' % \
-    (pdbid.upper())
+    url = f'https://www.rcsb.org/structure/{pdbid.upper()}'
     try:
-        pdbWebPage_f = urllib2.urlopen(url)
-        pagecontents = pdbWebPage_f.read()
-    except urllib2.HTTPError:
+        pdbWebPage_f = urlrequest.urlopen(url)
+        pagecontents = pdbWebPage_f.read().decode('utf-8')
+    except urlerror:
+        print('error')
         resolution = 'N/F'
         return resolution
-    resolution = re.search('(?<=\<strong\>Resolution:&nbsp<\/strong\>)(.*?)(?=&nbsp&Aring;)', pagecontents).group(1)
+    soup = BeautifulSoup(pagecontents, features="lxml")
+    tags = soup.find_all(id=re.compile('exp_header_.*_resolution'))
+    resolution = (re.findall('\d+\.\d+', str(tags[0])) if len(tags) else ['N/F'])[0]
     if not len(resolution):
         resolution = 'N/A'
     return resolution
@@ -354,40 +477,25 @@ def pdb_rsln(pdbid):
 
     assert len(pdbid) > 3
     pdbid = pdbid.upper()[:4]
+    db_path = os.path.expanduser("~/Proteins/misc/pdb_rsln.dat")
+    (db_dir, db_file) = os.path.split(db_path)
+    os.makedirs(db_dir, exist_ok=True)
 
-    # access local db of resolution if available
-    db_path = os.path.expanduser('~/Proteins/misc/pdb_rsln.dat')
-    db_exists = os.path.exists(db_path)
-    db_dir, db_file = os.path.split(db_path)
-
-    # is it available
-    if db_exists:
-        # read in its contents
-        f = open(db_path, 'r')
-        contents = f.read()
-        f.close()
-        contentlines = contents.splitlines()
-        pdbids = array([])
-        rslns = array([])
-        for line in contentlines:
-            line_parts = line.split()
-            pdbids = append(pdbids, line_parts[0])
-            rslns = append(rslns, line_parts[1])
-        # is pdbid of interest already in local db
-        if pdbid in pdbids:
-            rsln = rslns[pdbids == pdbid][0]
-            if rsln not in ['N/A', 'N/F']:
-                return rsln
-    # if not
-    else:
-        # does the directory not exist
-        if not os.path.exists(db_dir):
-            os.makedirs(db_dir)
-
+    try:
+        with open(db_path, 'r') as f:
+            pdbids = array([])
+            rslns = array([])
+            for line in f:
+                line_parts = line.split()
+                pdbids = append(pdbids, line_parts[0])
+                rslns = append(rslns, line_parts[1])
+            if pdbid in pdbids:
+                rsln = rslns[pdbids == pdbid][0]
+                if rsln not in ['N/A', 'N/F']:
+                    return rsln
+    except IOError:
+        pass
     rsln = '%.2f' % float(get_pdb_resolution_from_web(pdbid))
-    f = open(db_path, 'a')
-    f.write('%s %s\n' % (pdbid, rsln))
-    f.close()
+    with open(db_path, 'a') as f:
+        f.write('%s %s\n' % (pdbid, rsln))
     return rsln
-
-    
