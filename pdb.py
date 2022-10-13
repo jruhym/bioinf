@@ -459,7 +459,7 @@ def get_pdb_resolution_from_web(pdbid):
         return resolution
     soup = BeautifulSoup(pagecontents, features="lxml")
     tags = soup.find_all(id=re.compile('exp_header_.*_resolution'))
-    resolution = (re.findall('\d+\.\d+', tags[0]) if len(tags) else ['N/F'])[0]
+    resolution = (re.findall('\d+\.\d+', str(tags[0])) if len(tags) else ['N/F'])[0]
     if not len(resolution):
         resolution = 'N/A'
     return resolution
