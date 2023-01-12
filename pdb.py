@@ -6,6 +6,7 @@ import re
 from numpy import array, append # TODO: use np
 import numpy as np
 from bs4 import BeautifulSoup
+import functools
 
 class PDBHelixLine(object):
 
@@ -292,30 +293,37 @@ class PDBProtein(object):
             assert(forces.shape == (len(atoms), 3))
         
         residues = {}
-        self._residues = []
         for i, atom_line in enumerate(atoms_lines):
             atom = PDBAtom(atom_line, forces[i]) if does_have_forces else PDBAtom(atom_line)
             res_atoms = residues.get(atom.resSeq, [])
             res_atoms.append(atom)
             residues[atom.resSeq] = res_atoms
-        for res_atoms in residues.values():
-            self._residues.append(PDBResidue(res_atoms))
+        self._residues = { k:PDBResidue(v) for (k, v) in residues.items()}
     
-    residues = property(lambda self: self._residues)
+    residues = property(lambda self: list(self._residues.values()))
+    residues_dict = property(lambda self: self._residues)
 
     def strip_hydrogens(self):
-        for residue in self._residues:
+        for residue in self.residues:
             residue.strip_hydrogens()
 
     def rename_atoms(self, names_map):
-        for residue in self._residues:
+        for residue in self.residues:
             residue.rename_atoms(names_map)
 
-    def __str__(self):
-        return '\n'.join(f"{residue_out}" for residue_out in [str(residue) for residue in self._residues])
+    def is_closer_than(self, d, residue):
+        for this_residue in self.residues:
+            if this_residue.is_closer_than(d, residue):
+                return True
+        return False
 
+    def __str__(self):
+        return '\n'.join(f"{residue_out}" for residue_out in [str(residue) for residue in self.residues])
+
+@functools.total_ordering
 class PDBResidue(object):
     def __init__(self, atoms, forces=np.array([])):
+        assert(type(atoms[0]) == PDBAtom)
         if forces.size > 0:
             assert(type(forces) == np.ndarray)
             assert(forces.shape == (len(atoms), 3))
@@ -327,6 +335,7 @@ class PDBResidue(object):
     force = property(lambda self: np.sum(np.array([atom.force for atom in self._atoms]), axis=0))
     resSeq = property(lambda self: self._atoms[0].resSeq)
     resName = property(lambda self: self._atoms[0].resName)
+    chainID = property(lambda self: self._atoms[0].chainID)
 
     def strip_hydrogens(self):
         self._atoms = [atom for atom in self._atoms if not atom.is_hydrogen()]
@@ -343,13 +352,31 @@ class PDBResidue(object):
         for atom in self._atoms:
             atom.set_name(names_map[atom.name])
 
+    def is_closer_than(self, d, residue):
+        for atom in self._atoms:
+            if atom.is_hydrogen(): 
+                continue
+            for residue_atom in residue.atoms:
+                if residue_atom.is_hydrogen():
+                    continue
+                if atom.distance_to(residue_atom) < d:
+                    return True
+        return False
+
     def __str__(self):
         return '\n'.join(f"{atom_out}" for atom_out in [str(atom) for atom in self._atoms])
+
+    def __lt__(self, other):
+        return int(self.resSeq) < int(other.resSeq)
+
+    def __eq__(self, other):
+        return self.resSeq == other.resSeq
 
 class PDBAtom(object):
     def __init__(self, atom_line, force=np.zeros(3)):
         self._atom_line = atom_line
         self._force = force
+        self._r = np.array([float(self._atom_line.x), float(self._atom_line.y), float(self._atom_line.z)])
     
     def set_force(self, force):
         assert(type(force) == np.ndarray)
@@ -360,7 +387,9 @@ class PDBAtom(object):
     force = property(lambda self: self._force, set_force)
     resSeq = property(lambda self: self._atom_line.resSeq)
     resName = property(lambda self: self._atom_line.resName)
-    r = property(lambda self: np.array([float(self._atom_line.x), float(self._atom_line.y), float(self._atom_line.z)]))
+    chainID = property(lambda self: self._atom_line.chainID)
+    r = property(lambda self: self._r)
+    serial = property(lambda self: self._atom_line.serial)
 
     def set_name(self, name):
         assert type(name) == str
@@ -372,6 +401,10 @@ class PDBAtom(object):
 
     def __str__(self):
         return str(self._atom_line)
+
+    def distance_to(self, atom):
+        return np.linalg.norm(self._r - atom.r)
+
 
 def parse_pdb_ATOM_line(atm_line):
 
