@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 import functools
 
 class PDBHelixLine(object):
-
     @classmethod
     def parse_string(cls, string):
         assert type(string) == str 
@@ -148,9 +147,7 @@ def parse_pdb_HELIX_line(hlx_line):
     return parts
 
 
-
 class PDBAtomLine(object):
-
     @classmethod
     def parse_string(cls, string):
         assert type(string) == str 
@@ -320,6 +317,7 @@ class PDBProtein(object):
     def __str__(self):
         return '\n'.join(f"{residue_out}" for residue_out in [str(residue) for residue in self.residues])
 
+
 @functools.total_ordering
 class PDBResidue(object):
     def __init__(self, atoms, forces=np.array([])):
@@ -371,6 +369,7 @@ class PDBResidue(object):
 
     def __eq__(self, other):
         return self.resSeq == other.resSeq
+
 
 class PDBAtom(object):
     def __init__(self, atom_line, force=np.zeros(3)):
