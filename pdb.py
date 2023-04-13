@@ -408,6 +408,8 @@ class PDBAtom(object):
     chainID = property(lambda self: self._atom_line.chainID)
     r = property(lambda self: self._r)
     serial = property(lambda self: self._atom_line.serial)
+    element = property(lambda self: self._atom_line.element)
+    charge = property(lambda self: self._atom_line.charge)
 
     def set_name(self, name):
         assert type(name) == str
