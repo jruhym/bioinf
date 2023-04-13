@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 import functools
 
 class PDBHelixLine(object):
-
     @classmethod
     def parse_string(cls, string):
         assert type(string) == str 
@@ -148,9 +147,7 @@ def parse_pdb_HELIX_line(hlx_line):
     return parts
 
 
-
 class PDBAtomLine(object):
-
     @classmethod
     def parse_string(cls, string):
         assert type(string) == str 
@@ -238,7 +235,13 @@ class PDBAtomLine(object):
     def copy_with(self, serial="<replace>", name="<replace>", altLoc="<replace>", resName="<replace>",
         chainID="<replace>", resSeq="<replace>", iCode="<replace>", x="<replace>", y="<replace>", z="<replace>",
         occupancy="<replace>", tempFactor="<replace>", element="<replace>", charge="<replace>",
-        kind="<replace>"):
+        kind="<replace>", r=np.empty(0)):
+        if len(r):
+            assert(x == y and y == z and z == "<replace>")
+            assert(len(r) == 3)
+            xx, yy, zz = [f'{d:7.3f}' for d in r]
+        else:
+            xx, yy, zz = x, y, z
         return PDBAtomLine(self._serial if serial == "<replace>" else serial,
             self._name if name == "<replace>" else name,
             self._altLoc if altLoc == "<replace>" else altLoc,
@@ -246,9 +249,9 @@ class PDBAtomLine(object):
             self._chainID if chainID == "<replace>" else chainID,
             self._resSeq if resSeq == "<replace>" else resSeq,
             self._iCode if iCode == "<replace>" else iCode,
-            self._x if x == "<replace>" else x,
-            self._y if y == "<replace>" else y,
-            self._z if z == "<replace>" else z,
+            self._x if xx == "<replace>" else xx,
+            self._y if yy == "<replace>" else yy,
+            self._z if zz == "<replace>" else zz,
             self._occupancy if occupancy == "<replace>" else occupancy,
             self._tempFactor if tempFactor == "<replace>" else tempFactor,
             self._element if element == "<replace>" else element,
@@ -285,8 +288,13 @@ class PDBAtomLine(object):
     def __str__(self):
         return print_pdb_ATOM_line(self.as_dict())
 
+
 class PDBProtein(object):
-    def __init__(self, atoms_lines, forces=np.array([])):
+    def __init__(self, atoms_lines, forces=np.array([]), reindex_map=None, first_reindex=1):
+        if reindex_map != None:
+            assert(type(reindex_map) == dict)
+            assert(len(reindex_map) == 0)
+
         does_have_forces = forces.size > 0
         if does_have_forces:
             assert(type(forces) == np.ndarray)
@@ -294,11 +302,16 @@ class PDBProtein(object):
         
         residues = {}
         for i, atom_line in enumerate(atoms_lines):
-            atom = PDBAtom(atom_line, forces[i]) if does_have_forces else PDBAtom(atom_line)
+            new_index = atom_line.serial
+            if reindex_map != None:
+                new_index = f'{i+first_reindex}'
+                reindex_map[f'{atom_line.resSeq}:{atom_line.name}'] = (atom_line.serial, new_index)
+            atom_line_copy = atom_line.copy_with(serial=new_index)
+            atom = PDBAtom(atom_line_copy, forces[i]) if does_have_forces else PDBAtom(atom_line_copy)
             res_atoms = residues.get(atom.resSeq, [])
             res_atoms.append(atom)
             residues[atom.resSeq] = res_atoms
-        self._residues = { k:PDBResidue(v) for (k, v) in residues.items()}
+        self._residues = {k:PDBResidue(v) for (k, v) in residues.items()}
     
     residues = property(lambda self: list(self._residues.values()))
     residues_dict = property(lambda self: self._residues)
@@ -319,6 +332,7 @@ class PDBProtein(object):
 
     def __str__(self):
         return '\n'.join(f"{residue_out}" for residue_out in [str(residue) for residue in self.residues])
+
 
 @functools.total_ordering
 class PDBResidue(object):
@@ -363,6 +377,9 @@ class PDBResidue(object):
                     return True
         return False
 
+    def atoms_by_name(self, has_hydrogens=True):
+        return {atom.name:atom for atom in self._atoms if (has_hydrogens or not atom.is_hydrogen())}
+
     def __str__(self):
         return '\n'.join(f"{atom_out}" for atom_out in [str(atom) for atom in self._atoms])
 
@@ -371,6 +388,7 @@ class PDBResidue(object):
 
     def __eq__(self, other):
         return self.resSeq == other.resSeq
+
 
 class PDBAtom(object):
     def __init__(self, atom_line, force=np.zeros(3)):
@@ -390,6 +408,8 @@ class PDBAtom(object):
     chainID = property(lambda self: self._atom_line.chainID)
     r = property(lambda self: self._r)
     serial = property(lambda self: self._atom_line.serial)
+    element = property(lambda self: self._atom_line.element)
+    charge = property(lambda self: self._atom_line.charge)
 
     def set_name(self, name):
         assert type(name) == str
