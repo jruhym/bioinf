@@ -288,8 +288,13 @@ class PDBAtomLine(object):
     def __str__(self):
         return print_pdb_ATOM_line(self.as_dict())
 
+
 class PDBProtein(object):
-    def __init__(self, atoms_lines, forces=np.array([])):
+    def __init__(self, atoms_lines, forces=np.array([]), reindex_map=None, first_reindex=1):
+        if reindex_map != None:
+            assert(type(reindex_map) == dict)
+            assert(len(reindex_map) == 0)
+
         does_have_forces = forces.size > 0
         if does_have_forces:
             assert(type(forces) == np.ndarray)
@@ -297,7 +302,12 @@ class PDBProtein(object):
         
         residues = {}
         for i, atom_line in enumerate(atoms_lines):
-            atom = PDBAtom(atom_line, forces[i]) if does_have_forces else PDBAtom(atom_line)
+            new_index = atom_line.serial
+            if reindex_map != None:
+                new_index = f'{i+first_reindex}'
+                reindex_map[f'{atom_line.resSeq}:{atom_line.name}'] = (atom_line.serial, new_index)
+            atom_line_copy = atom_line.copy_with(serial=new_index)
+            atom = PDBAtom(atom_line_copy, forces[i]) if does_have_forces else PDBAtom(atom_line_copy)
             res_atoms = residues.get(atom.resSeq, [])
             res_atoms.append(atom)
             residues[atom.resSeq] = res_atoms
