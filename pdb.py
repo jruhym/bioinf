@@ -311,7 +311,7 @@ class PDBProtein(object):
             res_atoms = residues.get(atom.resSeq, [])
             res_atoms.append(atom)
             residues[atom.resSeq] = res_atoms
-        self._residues = { k:PDBResidue(v) for (k, v) in residues.items()}
+        self._residues = {k:PDBResidue(v) for (k, v) in residues.items()}
     
     residues = property(lambda self: list(self._residues.values()))
     residues_dict = property(lambda self: self._residues)
