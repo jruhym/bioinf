@@ -377,6 +377,9 @@ class PDBResidue(object):
                     return True
         return False
 
+    def atoms_by_name(self, has_hydrogens=True):
+        return {atom.name:atom for atom in self._atoms if (has_hydrogens or not atom.is_hydrogen())}
+
     def __str__(self):
         return '\n'.join(f"{atom_out}" for atom_out in [str(atom) for atom in self._atoms])
 
